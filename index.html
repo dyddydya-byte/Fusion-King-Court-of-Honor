@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Fusion King Court of Honor</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#14111f" />
+
+<!--
+  ============================================================
+  SETUP — read this before you deploy
+  ============================================================
+  1. Go to https://console.firebase.google.com -> Add project (free).
+  2. Inside the project: Build -> Firestore Database -> Create database
+     -> start in TEST MODE (you can tighten rules later) -> pick a region.
+  3. Project settings (gear icon, top left) -> scroll to "Your apps"
+     -> click the </> (web) icon -> register an app (any nickname,
+     you do NOT need Firebase Hosting) -> it shows you a config object.
+  4. Copy that object's values into firebaseConfig below.
+  5. (Recommended) Firestore -> Rules tab, paste:
+       rules_version = '2';
+       service cloud.firestore {
+         match /databases/{database}/documents {
+           match /boards/{boardId} { allow read, write: if true; }
+         }
+       }
+     This keeps it open (simple, fine for a personal/family app) but
+     scoped to just this app's data instead of your whole project.
+  6. Upload this file + manifest.json to any static host
+     (GitHub Pages, Netlify, Vercel...) and open the link on your phone.
+  ============================================================
+-->
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; }
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+  .cup-app {
+    --ink: #14111f; --panel: #1c1729; --edge: #34294c; --brass: #c9a227; --brass-soft: #8a7128;
+    --parchment: #e9e2d0; --parchment-dim: #948a78; --moss: #6fae73; --garnet: #a23e3e;
+    background: radial-gradient(ellipse 80% 50% at 50% -10%, #241d3a 0%, var(--ink) 60%);
+    color: var(--parchment); font-family: 'Inter', sans-serif; min-height: 100vh;
+  }
+  .cup-app .display { font-family: 'Cormorant Garamond', serif; }
+  .cup-app .tabular { font-variant-numeric: tabular-nums; }
+  .cup-app .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--brass-soft) 15%, var(--brass) 50%, var(--brass-soft) 85%, transparent); opacity: 0.55; }
+  .cup-app .plaque { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; }
+  .cup-app .roman { font-family: 'Cormorant Garamond', serif; color: var(--brass); }
+  .cup-app .pt-btn { font-family: 'Inter', sans-serif; border: 1px solid var(--edge); background: transparent; }
+  .cup-app .pt-btn.pos { color: var(--moss); border-color: rgba(111,174,115,0.35); }
+  .cup-app .pt-btn.neg { color: var(--garnet); border-color: rgba(162,62,62,0.35); }
+  .cup-app .pt-btn:disabled { opacity: 0.6; }
+  .cup-app input, .cup-app select { background: #161029; border: 1px solid var(--edge); color: var(--parchment); }
+  .cup-app input::placeholder { color: var(--parchment-dim); }
+  .cup-app .seal { position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(162,62,62,0.5); background: rgba(162,62,62,0.08); overflow: hidden; flex-shrink: 0; }
+  .cup-app .seal-fill { position: absolute; inset: 0; background: var(--garnet); }
+  .cup-app *:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  .cup-app .house-section { border-left: 3px solid; border-radius: 6px; padding: 14px; margin-bottom: 22px; }
+  .cup-app .gear-btn { background: transparent; border: 1px solid var(--edge); border-radius: 8px; padding: 8px; }
+  .cup-app .lock-circle { width: 76px; height: 76px; border-radius: 50%; border: 1px solid var(--edge); background: var(--panel); display: flex; align-items: center; justify-content: center; }
+  .cup-app .spinner { display: inline-block; border: 2px solid rgba(255,255,255,0.25); border-top-color: currentColor; border-radius: 50%; animation: cupspin 0.8s linear infinite; }
+  @keyframes cupspin { to { transform: rotate(360deg); } }
+  .cup-app .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--moss); display: inline-block; box-shadow: 0 0 6px var(--moss); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ============================================================
+// Firebase config — replace with your own (see comment block above)
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyDEmBqt3bohrZrfy6VdAaxJY8m1dg-wMiU",
+  authDomain: "fusion-king-court-of-honor.firebaseapp.com",
+  projectId: "fusion-king-court-of-honor",
+  storageBucket: "fusion-king-court-of-honor.firebasestorage.app",
+  messagingSenderId: "65202811684",
+  appId: "1:65202811684:web:ef28ba2b20e84032ba79b1"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const BOARD_ID = 'fusion-king-court-of-honor';
+const boardRef = db.collection('boards').doc(BOARD_ID);
+const LOCAL_KEY = 'cup-local-v1';
+
+// ============================================================
+// Tiny icon shims (no icon library needed — just emoji/glyphs
+// sized via the same className props the rest of the app passes in)
+// ============================================================
+const Icon = ({ children, className = '', style = {} }) => (
+  <span className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, fontSize: '1em', ...style }}>{children}</span>
+);
+const Plus = (p) => <Icon {...p}>+</Icon>;
+const Trash2 = (p) => <Icon {...p}>🗑</Icon>;
+const X = (p) => <Icon {...p}>✕</Icon>;
+const Loader2 = (p) => <span className={`spinner ${p.className || ''}`} style={p.style}></span>;
+const ChevronDown = (p) => <Icon {...p}>▾</Icon>;
+const ChevronUp = (p) => <Icon {...p}>▴</Icon>;
+const Check = (p) => <Icon {...p}>✓</Icon>;
+const ArrowRightLeft = (p) => <Icon {...p}>⇄</Icon>;
+const Settings = (p) => <Icon {...p}>⚙</Icon>;
+const ArrowLeft = (p) => <Icon {...p}>←</Icon>;
+const Fingerprint = (p) => <Icon {...p}>🖐</Icon>;
+const Lock = (p) => <Icon {...p}>🔒</Icon>;
+const Archive = (p) => <Icon {...p}>📦</Icon>;
+const Crown = (p) => <Icon {...p}>👑</Icon>;
+const TrendingUp = (p) => <Icon {...p}>📈</Icon>;
+const Download = (p) => <Icon {...p}>⬇</Icon>;
+const Upload = (p) => <Icon {...p}>⬆</Icon>;
+const LogOut = (p) => <Icon {...p}>⎋</Icon>;
+
+// Tiny dependency-free sparkline, replaces recharts
+function Sparkline({ data }) {
+  if (!data || data.length < 2) return null;
+  const w = 280, h = 90, pad = 8;
+  const values = data.map(d => d.points);
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = (max - min) || 1;
+  const stepX = (w - pad * 2) / (data.length - 1);
+  const pts = data.map((d, i) => {
+    const x = pad + i * stepX;
+    const y = h - pad - ((d.points - min) / range) * (h - pad * 2);
+    return [x, y];
+  });
+  const pointsAttr = pts.map(p => p.join(',')).join(' ');
+  return (
+    <div>
+      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 90 }}>
+        <polyline points={pointsAttr} fill="none" stroke="#c9a227" strokeWidth="2" />
+        {pts.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="2.5" fill="#c9a227" />)}
+      </svg>
+      <div className="flex justify-between text-xs" style={{ color: 'var(--parchment-dim)' }}>
+        <span>{data[0].label}</span>
+        <span>{data[data.length - 1].label}</span>
+      </div>
+    </div>
+  );
+}
+
+const HOLD_MS = 1500;
+const DEFAULT_DATA = {
+  title: 'Fusion King Court of Honor',
+  members: [],
+  activity: [],
+  archive: [],
+  hallOfFame: [],
+  pointHistory: [],
+  lastCrownedAt: null,
+  crownCooldownValue: 30,
+  crownCooldownUnit: 'days',
+  houseWins: { gryffindor: 0, slytherin: 0, ravenclaw: 0, hufflepuff: 0 },
+  fingerprintEnabled: false,
+  fingerprintCredentialId: null,
+  boardLocked: false,
+};
+
+const HOUSES = [
+  { key: 'gryffindor', name: 'Gryffindor', color: '#c8332b', soft: 'rgba(200,51,43,0.10)', edge: 'rgba(200,51,43,0.4)' },
+  { key: 'slytherin', name: 'Slytherin', color: '#3c8c63', soft: 'rgba(60,140,99,0.10)', edge: 'rgba(60,140,99,0.4)' },
+  { key: 'ravenclaw', name: 'Ravenclaw', color: '#4169b0', soft: 'rgba(65,105,176,0.10)', edge: 'rgba(65,105,176,0.4)' },
+  { key: 'hufflepuff', name: 'Hufflepuff', color: '#e0b321', soft: 'rgba(224,179,33,0.10)', edge: 'rgba(224,179,33,0.4)' },
+];
+
+function houseInfo(key) { return HOUSES.find(h => h.key === key) || null; }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function toRoman(num) {
+  if (num > 49) return String(num);
+  const table = [[40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+  let n = num, out = '';
+  for (const [v, s] of table) { while (n >= v) { out += s; n -= v; } }
+  return out;
+}
+function applyMigrations(parsed) {
+  const members = (parsed.members || []).map(m => ({ house: null, wins: 0, pointsAtLastCrown: 0, improvedWins: 0, ...m }));
+  const houseWins = { ...DEFAULT_DATA.houseWins, ...(parsed.houseWins || {}) };
+  const cooldownPatch = (parsed.crownCooldownDays != null && parsed.crownCooldownValue == null)
+    ? { crownCooldownValue: parsed.crownCooldownDays, crownCooldownUnit: 'days' }
+    : {};
+  const boardLocked = parsed.boardLocked != null ? parsed.boardLocked : !!(parsed.fingerprintEnabled && parsed.fingerprintCredentialId);
+  return { ...DEFAULT_DATA, ...parsed, ...cooldownPatch, members, houseWins, boardLocked, pointHistory: parsed.pointHistory || [] };
+}
+
+// ---- WebAuthn helpers ----
+function bufToBase64url(buf) {
+  const bytes = new Uint8Array(buf);
+  let str = '';
+  for (let i = 0; i < bytes.byteLength; i++) str += String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function base64urlToBuf(b64url) {
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+  const str = atob(b64 + pad);
+  const bytes = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
+  return bytes;
+}
+function randomBytes(n) {
+  const arr = new Uint8Array(n);
+  if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(arr);
+  return arr;
+}
+async function checkBiometricSupport() {
+  try {
+    if (!window.PublicKeyCredential || !navigator.credentials) return false;
+    return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch (e) { return false; }
+}
+
+function TheCup() {
+  const [data, setData] = useState(DEFAULT_DATA);
+  const [loaded, setLoaded] = useState(false);
+  const [synced, setSynced] = useState(false);
+  const [view, setView] = useState('board');
+  const dataRef = useRef(data);
+  useEffect(() => { dataRef.current = data; }, [data]);
+
+  const [localAdminUnlocked, setLocalAdminUnlocked] = useState(false);
+  const [localPinCode, setLocalPinCode] = useState(null);
+
+  const [newName, setNewName] = useState('');
+  const [addingHouse, setAddingHouse] = useState(false);
+  const [showLedger, setShowLedger] = useState(false);
+  const [showHallOfFame, setShowHallOfFame] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [chartOpenFor, setChartOpenFor] = useState(null);
+
+  const [holdTarget, setHoldTarget] = useState(null);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdRef = useRef(null);
+
+  const [forgetTarget, setForgetTarget] = useState(null);
+  const [forgetProgress, setForgetProgress] = useState(0);
+  const forgetRef = useRef(null);
+
+  const [moveOpenFor, setMoveOpenFor] = useState(null);
+  const [movePendingHouse, setMovePendingHouse] = useState(null);
+
+  const [customInputs, setCustomInputs] = useState({});
+  const [pointHold, setPointHold] = useState(null);
+  const [pointHoldProgress, setPointHoldProgress] = useState(0);
+  const pointHoldRef = useRef(null);
+
+  const [bioStatus, setBioStatus] = useState('idle');
+  const [fingerprintBusy, setFingerprintBusy] = useState(null);
+  const [fingerprintNotice, setFingerprintNotice] = useState(null);
+
+  const [pinSetupInput, setPinSetupInput] = useState('');
+  const [importNotice, setImportNotice] = useState(null);
+  const importInputRef = useRef(null);
+
+  const [lockMode, setLockMode] = useState('fingerprint');
+  const [lockBusy, setLockBusy] = useState(false);
+  const [lockError, setLockError] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+
+  // ---- shared board: live Firestore listener ----
+  useEffect(() => {
+    const unsub = boardRef.onSnapshot(
+      (snap) => {
+        if (snap.exists) {
+          const next = applyMigrations(snap.data());
+          dataRef.current = next;
+          setData(next);
+        } else {
+          boardRef.set(DEFAULT_DATA).catch(() => {});
+        }
+        setSynced(true);
+        setLoaded(true);
+      },
+      (err) => { console.error('Firestore sync error', err); setLoaded(true); }
+    );
+    return () => unsub();
+  }, []);
+
+  // ---- local-only device state: real localStorage ----
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LOCAL_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setLocalAdminUnlocked(!!parsed.localAdminUnlocked);
+        setLocalPinCode(parsed.localPinCode || null);
+      }
+    } catch (e) {}
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LOCAL_KEY, JSON.stringify({ localAdminUnlocked, localPinCode }));
+    } catch (e) {}
+  }, [localAdminUnlocked, localPinCode]);
+
+  // Apply an update locally (instant) and push it to Firestore (syncs everyone)
+  const pushUpdate = (updater) => {
+    const next = updater(dataRef.current);
+    dataRef.current = next;
+    setData(next);
+    boardRef.set(next).catch(err => console.error('sync failed', err));
+  };
+
+  const logEntry = (text) => {
+    pushUpdate(d => ({ ...d, activity: [{ id: uid(), ts: Date.now(), text }, ...d.activity].slice(0, 60) }));
+  };
+
+  // ---- add person ----
+  const openAddHouseChooser = () => { if (newName.trim()) setAddingHouse(true); };
+  const cancelAdd = () => { setAddingHouse(false); setNewName(''); };
+  const finalizeAdd = (houseKey) => {
+    const name = newName.trim();
+    if (!name) return;
+    pushUpdate(d => ({ ...d, members: [...d.members, { id: uid(), name, house: houseKey, points: 0, wins: 0, pointsAtLastCrown: 0, improvedWins: 0 }] }));
+    logEntry(`${name} was sorted into ${houseInfo(houseKey).name}`);
+    setNewName('');
+    setAddingHouse(false);
+  };
+
+  // ---- points ----
+  const changePoints = (id, name, delta) => {
+    if (!delta) return;
+    pushUpdate(d => {
+      const members = d.members.map(m => m.id === id ? { ...m, points: m.points + delta } : m);
+      const updated = members.find(m => m.id === id);
+      const pointHistory = [...d.pointHistory, { id: uid(), memberId: id, ts: Date.now(), points: updated ? updated.points : 0 }].slice(-400);
+      return { ...d, members, pointHistory };
+    });
+    logEntry(`${name} ${delta > 0 ? '+' : ''}${delta} point${Math.abs(delta) === 1 ? '' : 's'}`);
+  };
+
+  const beginPointHold = (id, name, delta, isCustom = false) => {
+    if (pointHoldRef.current) clearInterval(pointHoldRef.current);
+    setPointHold({ id, name, delta, isCustom });
+    setPointHoldProgress(0);
+    const start = Date.now();
+    pointHoldRef.current = setInterval(() => {
+      const pct = Math.min(100, ((Date.now() - start) / HOLD_MS) * 100);
+      setPointHoldProgress(pct);
+      if (pct >= 100) {
+        clearInterval(pointHoldRef.current);
+        changePoints(id, name, delta);
+        if (isCustom) setCustomInputs(c => ({ ...c, [id]: '' }));
+        setPointHold(null);
+        setPointHoldProgress(0);
+      }
+    }, 20);
+  };
+  const endPointHoldEarly = () => {
+    if (pointHoldRef.current) clearInterval(pointHoldRef.current);
+    setPointHold(null);
+    setPointHoldProgress(0);
+  };
+  const beginCustomHold = (id, name) => {
+    const raw = customInputs[id];
+    const val = parseInt(raw, 10);
+    if (!raw || Number.isNaN(val) || val === 0) return;
+    beginPointHold(id, name, val, true);
+  };
+
+  // ---- fingerprint ----
+  const verifyFingerprint = async () => {
+    if (!data.fingerprintCredentialId) return false;
+    try {
+      await navigator.credentials.get({
+        publicKey: {
+          challenge: randomBytes(32),
+          allowCredentials: [{ id: base64urlToBuf(data.fingerprintCredentialId), type: 'public-key', transports: ['internal'] }],
+          userVerification: 'required',
+          timeout: 60000,
+        },
+      });
+      return true;
+    } catch (e) { return false; }
+  };
+  const handleFingerprintAdd = async (id, name, delta) => {
+    const key = `${id}:${delta}`;
+    setFingerprintBusy(key);
+    const ok = await verifyFingerprint();
+    setFingerprintBusy(null);
+    if (ok) changePoints(id, name, delta);
+    else {
+      setFingerprintNotice("Couldn't verify — try again.");
+      setTimeout(() => setFingerprintNotice(null), 2200);
+    }
+  };
+  const startEnroll = async () => {
+    setBioStatus('checking');
+    const supported = await checkBiometricSupport();
+    if (!supported) { setBioStatus('unsupported'); return; }
+    try {
+      const cred = await navigator.credentials.create({
+        publicKey: {
+          challenge: randomBytes(32),
+          rp: { name: data.title || 'Fusion King Court of Honor' },
+          user: { id: randomBytes(16), name: 'cup-owner', displayName: 'Cup Owner' },
+          pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+          authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+          timeout: 60000,
+          attestation: 'none',
+        },
+      });
+      const credId = bufToBase64url(cred.rawId);
+      pushUpdate(d => ({ ...d, fingerprintCredentialId: credId, fingerprintEnabled: true, boardLocked: true }));
+      setLocalAdminUnlocked(true);
+      setBioStatus('enrolled');
+    } catch (e) { setBioStatus('failed'); }
+  };
+  const disableFingerprint = () => pushUpdate(d => ({ ...d, fingerprintEnabled: false, boardLocked: !!localPinCode }));
+  const enableFingerprint = () => pushUpdate(d => ({ ...d, fingerprintEnabled: true, boardLocked: true }));
+  const forgetFingerprint = () => {
+    pushUpdate(d => ({ ...d, fingerprintEnabled: false, fingerprintCredentialId: null, boardLocked: !!localPinCode }));
+    setBioStatus('idle');
+  };
+
+  // ---- backup code, local to this device only ----
+  const saveLocalPin = () => {
+    const v = pinSetupInput.trim();
+    if (v.length < 4) return;
+    setLocalPinCode(v);
+    setLocalAdminUnlocked(true);
+    pushUpdate(d => ({ ...d, boardLocked: true }));
+    setPinSetupInput('');
+  };
+  const removeLocalPin = () => {
+    setLocalPinCode(null);
+    pushUpdate(d => ({ ...d, boardLocked: !!(data.fingerprintEnabled && data.fingerprintCredentialId) }));
+  };
+  const signOutAdmin = () => { setLocalAdminUnlocked(false); setView('board'); };
+
+  // ---- archive ----
+  const cancelHold = () => { if (holdRef.current) clearInterval(holdRef.current); setHoldTarget(null); setHoldProgress(0); };
+  const beginHold = (id) => {
+    if (holdRef.current) clearInterval(holdRef.current);
+    const start = Date.now();
+    holdRef.current = setInterval(() => {
+      const pct = Math.min(100, ((Date.now() - start) / HOLD_MS) * 100);
+      setHoldProgress(pct);
+      if (pct >= 100) { clearInterval(holdRef.current); finishHold(id); }
+    }, 25);
+  };
+  const endHoldEarly = () => { if (holdRef.current) clearInterval(holdRef.current); setHoldProgress(0); };
+  const finishHold = (id) => {
+    const m = dataRef.current.members.find(mm => mm.id === id);
+    if (m) {
+      pushUpdate(d => ({ ...d, members: d.members.filter(mm => mm.id !== id), archive: [{ ...m, archivedAt: Date.now() }, ...d.archive] }));
+      logEntry(`${m.name} was archived with ${m.points} point${Math.abs(m.points) === 1 ? '' : 's'}`);
+    }
+    setHoldTarget(null);
+    setHoldProgress(0);
+  };
+
+  const restoreMember = (id) => {
+    const m = dataRef.current.archive.find(a => a.id === id);
+    if (!m) return;
+    const { archivedAt, ...rest } = m;
+    pushUpdate(d => ({ ...d, archive: d.archive.filter(a => a.id !== id), members: [...d.members, rest] }));
+    logEntry(`${m.name} was restored from the archive`);
+  };
+  const cancelForget = () => { if (forgetRef.current) clearInterval(forgetRef.current); setForgetTarget(null); setForgetProgress(0); };
+  const beginForget = (id) => {
+    if (forgetRef.current) clearInterval(forgetRef.current);
+    const start = Date.now();
+    forgetRef.current = setInterval(() => {
+      const pct = Math.min(100, ((Date.now() - start) / HOLD_MS) * 100);
+      setForgetProgress(pct);
+      if (pct >= 100) { clearInterval(forgetRef.current); finishForget(id); }
+    }, 25);
+  };
+  const endForgetEarly = () => { if (forgetRef.current) clearInterval(forgetRef.current); setForgetProgress(0); };
+  const finishForget = (id) => {
+    const m = dataRef.current.archive.find(a => a.id === id);
+    pushUpdate(d => ({ ...d, archive: d.archive.filter(a => a.id !== id) }));
+    if (m) logEntry(`${m.name} was permanently deleted`);
+    setForgetTarget(null);
+    setForgetProgress(0);
+  };
+
+  // ---- move ----
+  const openMove = (memberId) => { cancelHold(); setMoveOpenFor(memberId); setMovePendingHouse(null); };
+  const cancelMove = () => { setMoveOpenFor(null); setMovePendingHouse(null); };
+  const confirmMove = (memberId) => {
+    const m = dataRef.current.members.find(m => m.id === memberId);
+    if (!m || !movePendingHouse) return;
+    const fromHouse = m.house ? houseInfo(m.house).name : 'Unsorted';
+    const toHouse = houseInfo(movePendingHouse).name;
+    pushUpdate(d => ({ ...d, members: d.members.map(mm => mm.id === memberId ? { ...mm, house: movePendingHouse } : mm) }));
+    logEntry(m.house ? `${m.name} moved from ${fromHouse} to ${toHouse}` : `${m.name} was sorted into ${toHouse}`);
+    setMoveOpenFor(null);
+    setMovePendingHouse(null);
+  };
+
+  const saveTitle = () => {
+    const t = titleDraft.trim();
+    pushUpdate(d => ({ ...d, title: t || d.title }));
+    setEditingTitle(false);
+  };
+
+  // ---- crowning ----
+  const daysSince = (ts) => (ts ? (Date.now() - ts) / 86400000 : null);
+  const unitMultiplier = { days: 1, months: 30, years: 365 };
+  const cooldown = (data.crownCooldownValue || 30) * (unitMultiplier[data.crownCooldownUnit] || 1);
+  const canCrown = data.members.length > 0 && (!data.lastCrownedAt || daysSince(data.lastCrownedAt) >= cooldown);
+  const daysRemaining = data.lastCrownedAt ? Math.max(0, Math.ceil(cooldown - daysSince(data.lastCrownedAt))) : 0;
+
+  const crownTheCup = () => {
+    if (!canCrown) return;
+    const members = dataRef.current.members;
+    const individual = members.reduce((best, m) => (!best || m.points > best.points) ? m : best, null);
+    const houseTotals = HOUSES.map(h => ({ ...h, total: members.filter(m => m.house === h.key).reduce((s, m) => s + m.points, 0) }));
+    const houseWinner = houseTotals.reduce((best, h) => (!best || h.total > best.total) ? h : best, null);
+    const improved = members.reduce((best, m) => {
+      const gain = m.points - (m.pointsAtLastCrown || 0);
+      return (gain > 0 && (!best || gain > best.gain)) ? { ...m, gain } : best;
+    }, null);
+
+    const record = {
+      id: uid(),
+      crownedAt: Date.now(),
+      individual: individual ? { id: individual.id, name: individual.name, house: individual.house, points: individual.points } : null,
+      house: houseWinner ? { key: houseWinner.key, name: houseWinner.name, total: houseWinner.total } : null,
+      improved: improved ? { id: improved.id, name: improved.name, gain: improved.gain } : null,
+    };
+
+    pushUpdate(d => ({
+      ...d,
+      lastCrownedAt: Date.now(),
+      hallOfFame: [record, ...d.hallOfFame],
+      members: d.members.map(m => {
+        let mm = m;
+        if (individual && m.id === individual.id) mm = { ...mm, wins: (mm.wins || 0) + 1 };
+        if (improved && m.id === improved.id) mm = { ...mm, improvedWins: (mm.improvedWins || 0) + 1 };
+        return { ...mm, pointsAtLastCrown: mm.points };
+      }),
+      houseWins: houseWinner ? { ...d.houseWins, [houseWinner.key]: (d.houseWins?.[houseWinner.key] || 0) + 1 } : d.houseWins,
+    }));
+
+    if (individual) logEntry(`🏆 ${individual.name} was crowned Cup Champion with ${individual.points} points`);
+    if (houseWinner) logEntry(`★ ${houseWinner.name} takes the star this term`);
+    if (improved) logEntry(`▲ ${improved.name} was Most Improved, +${improved.gain} points this term`);
+  };
+
+  // ---- backup export/import ----
+  const exportBackup = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(data.title || 'fusion-king-court-of-honor').replace(/\s+/g, '-').toLowerCase()}-backup.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  const handleImportFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        pushUpdate(() => applyMigrations(parsed));
+        setImportNotice('Backup restored.');
+      } catch (err) { setImportNotice("Couldn't read that file."); }
+      setTimeout(() => setImportNotice(null), 2500);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // ---- Settings gate ----
+  const securityConfigured = !!data.boardLocked;
+  const canEdit = !securityConfigured || localAdminUnlocked;
+  const openSettingsGate = () => {
+    if (!securityConfigured) { setView('settings'); return; }
+    setLockMode(data.fingerprintEnabled && data.fingerprintCredentialId ? 'fingerprint' : 'pin');
+    setPinInput(''); setPinError(false); setLockError(false);
+    setView('lock');
+  };
+  const attemptLockFingerprint = async () => {
+    setLockBusy(true);
+    const ok = await verifyFingerprint();
+    setLockBusy(false);
+    if (ok) { setLocalAdminUnlocked(true); setView('settings'); }
+    else { setLockError(true); setTimeout(() => setLockError(false), 1800); }
+  };
+  const attemptLocalPin = () => {
+    if (pinInput && localPinCode && pinInput === localPinCode) {
+      setLocalAdminUnlocked(true);
+      setView('settings');
+      setPinInput('');
+    } else {
+      setPinError(true);
+      setPinInput('');
+      setTimeout(() => setPinError(false), 1500);
+    }
+  };
+
+  const unsorted = data.members.filter(m => !m.house);
+  const standings = HOUSES.map(h => ({ ...h, total: data.members.filter(m => m.house === h.key).reduce((s, m) => s + m.points, 0) })).sort((a, b) => b.total - a.total);
+  const grandTotal = data.members.reduce((s, m) => s + m.points, 0);
+  const useFingerprintForAdd = !!(data.fingerprintEnabled && data.fingerprintCredentialId);
+
+  const WinBadge = ({ wins }) => wins > 0 ? <span className="text-xs ml-1.5" style={{ color: 'var(--brass)' }}>★{wins > 1 ? `×${wins}` : ''}</span> : null;
+  const ImprovedBadge = ({ count }) => count > 0 ? <span className="text-xs ml-1" style={{ color: 'var(--moss)' }}>▲{count > 1 ? `×${count}` : ''}</span> : null;
+
+  const getMemberHistory = (id) => data.pointHistory
+    .filter(h => h.memberId === id)
+    .sort((a, b) => a.ts - b.ts)
+    .map(h => ({ points: h.points, label: new Date(h.ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }));
+
+  const renderBoardRow = (m, rank) => {
+    const history = chartOpenFor === m.id ? getMemberHistory(m.id) : null;
+    return (
+      <div key={m.id} className="plaque p-4 mb-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="roman text-lg w-6 text-center flex-shrink-0">{toRoman(rank)}</span>
+            <span className="font-medium text-sm truncate" style={{ color: 'var(--parchment)' }}>{m.name}</span>
+            <WinBadge wins={m.wins} />
+            <ImprovedBadge count={m.improvedWins} />
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="tabular font-semibold text-lg" style={{ color: m.points > 0 ? 'var(--moss)' : m.points < 0 ? 'var(--garnet)' : 'var(--parchment-dim)' }}>{m.points}</span>
+            <button onClick={() => setChartOpenFor(o => o === m.id ? null : m.id)} aria-label={`Toggle chart for ${m.name}`}>
+              <TrendingUp className="w-3.5 h-3.5" style={{ color: chartOpenFor === m.id ? 'var(--brass)' : 'var(--parchment-dim)' }} />
+            </button>
+          </div>
+        </div>
+
+        {data.lastCrownedAt && (() => {
+          const gain = m.points - (m.pointsAtLastCrown || 0);
+          return <p className="text-xs pl-9 -mt-2 mb-3" style={{ color: 'var(--parchment-dim)' }}>{gain >= 0 ? '+' : ''}{gain} this term</p>;
+        })()}
+
+        {history && (
+          <div className="mb-3 pl-9">
+            {history.length < 2 ? (
+              <p className="text-xs" style={{ color: 'var(--parchment-dim)' }}>Not enough history yet — keep adjusting points to build a chart.</p>
+            ) : <Sparkline data={history} />}
+          </div>
+        )}
+
+        {canEdit ? (
+          <div className="flex items-center gap-1.5 flex-wrap pl-9">
+            {[-10, -5, -1, 1, 5, 10].map(v => {
+              if (v > 0 && useFingerprintForAdd) {
+                const busyKey = `${m.id}:${v}`;
+                const isBusy = fingerprintBusy === busyKey;
+                return (
+                  <button key={v} onClick={() => handleFingerprintAdd(m.id, m.name, v)} disabled={isBusy} className="pt-btn pos rounded-md px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1">
+                    {isBusy ? <Loader2 className="w-3 h-3" /> : <Fingerprint className="w-3 h-3" />}{`+${v}`}
+                  </button>
+                );
+              }
+              const isHeld = pointHold && pointHold.id === m.id && pointHold.delta === v && !pointHold.isCustom;
+              return (
+                <button key={v}
+                  onMouseDown={() => beginPointHold(m.id, m.name, v)} onMouseUp={endPointHoldEarly} onMouseLeave={endPointHoldEarly}
+                  onTouchStart={() => beginPointHold(m.id, m.name, v)} onTouchEnd={endPointHoldEarly}
+                  className={`pt-btn rounded-md px-2.5 py-1.5 text-xs font-semibold relative overflow-hidden ${v > 0 ? 'pos' : 'neg'}`}>
+                  {isHeld && <span className="absolute inset-0" style={{ background: v > 0 ? 'rgba(111,174,115,0.4)' : 'rgba(162,62,62,0.4)', clipPath: `inset(${100 - pointHoldProgress}% 0 0 0)` }} />}
+                  <span className="relative z-10">{v > 0 ? `+${v}` : v}</span>
+                </button>
+              );
+            })}
+            <input value={customInputs[m.id] || ''} onChange={e => setCustomInputs(c => ({ ...c, [m.id]: e.target.value.replace(/[^-0-9]/g, '') }))} placeholder="±" className="w-12 rounded-md px-1 py-1.5 text-xs text-center outline-none" />
+            <button
+              onMouseDown={() => beginCustomHold(m.id, m.name)} onMouseUp={endPointHoldEarly} onMouseLeave={endPointHoldEarly}
+              onTouchStart={() => beginCustomHold(m.id, m.name)} onTouchEnd={endPointHoldEarly}
+              className="pt-btn rounded-md px-2.5 py-1.5 text-xs font-semibold relative overflow-hidden" style={{ color: 'var(--parchment-dim)' }}>
+              {pointHold && pointHold.id === m.id && pointHold.isCustom && <span className="absolute inset-0" style={{ background: 'rgba(201,162,39,0.35)', clipPath: `inset(${100 - pointHoldProgress}% 0 0 0)` }} />}
+              <span className="relative z-10">Hold</span>
+            </button>
+          </div>
+        ) : <p className="text-xs pl-9" style={{ color: 'var(--parchment-dim)' }}>View only</p>}
+      </div>
+    );
+  };
+
+  const renderManageRow = (m) => {
+    const isHoldOpen = holdTarget === m.id;
+    const isMoveOpen = moveOpenFor === m.id;
+    const hi = m.house ? houseInfo(m.house) : null;
+    return (
+      <div key={m.id} className="plaque p-4 mb-3">
+        {isHoldOpen ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm" style={{ color: 'var(--parchment-dim)' }}>Hold the seal to archive <span style={{ color: 'var(--parchment)' }}>{m.name}</span></span>
+            <div className="flex items-center gap-2">
+              <button onMouseDown={() => beginHold(m.id)} onMouseUp={endHoldEarly} onMouseLeave={endHoldEarly} onTouchStart={() => beginHold(m.id)} onTouchEnd={endHoldEarly} className="seal" aria-label={`Hold to archive ${m.name}`}>
+                <div className="seal-fill" style={{ clipPath: `inset(${100 - holdProgress}% 0 0 0)` }} />
+                <Archive className="w-4 h-4 relative" style={{ color: '#f0d9d9', margin: '14px auto', zIndex: 1 }} />
+              </button>
+              <button onClick={cancelHold} aria-label="Cancel"><X className="w-4 h-4" style={{ color: 'var(--parchment-dim)' }} /></button>
+            </div>
+          </div>
+        ) : isMoveOpen ? (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm" style={{ color: 'var(--parchment-dim)' }}>
+                {movePendingHouse ? <>Move <span style={{ color: 'var(--parchment)' }}>{m.name}</span> to <span style={{ color: houseInfo(movePendingHouse).color }}>{houseInfo(movePendingHouse).name}</span>?</> : <>Move <span style={{ color: 'var(--parchment)' }}>{m.name}</span> to...</>}
+              </span>
+              <button onClick={cancelMove} aria-label="Cancel move"><X className="w-4 h-4" style={{ color: 'var(--parchment-dim)' }} /></button>
+            </div>
+            {movePendingHouse ? (
+              <div className="flex gap-2">
+                <button onClick={() => confirmMove(m.id)} className="flex-1 rounded-md py-2 text-xs font-semibold" style={{ background: houseInfo(movePendingHouse).soft, border: `1px solid ${houseInfo(movePendingHouse).edge}`, color: houseInfo(movePendingHouse).color }}>Confirm</button>
+                <button onClick={() => setMovePendingHouse(null)} className="flex-1 rounded-md py-2 text-xs font-semibold pt-btn" style={{ color: 'var(--parchment-dim)' }}>Back</button>
+              </div>
+            ) : (
+              <div className="flex gap-2 flex-wrap">
+                {HOUSES.filter(h => h.key !== m.house).map(h => (
+                  <button key={h.key} onClick={() => setMovePendingHouse(h.key)} className="rounded-md px-3 py-1.5 text-xs font-semibold" style={{ background: h.soft, border: `1px solid ${h.edge}`, color: h.color }}>{h.name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: hi ? hi.color : 'var(--parchment-dim)' }} />
+              <span className="text-sm font-medium truncate" style={{ color: 'var(--parchment)' }}>{m.name}</span>
+              <WinBadge wins={m.wins} />
+              <ImprovedBadge count={m.improvedWins} />
+              <span className="text-xs flex-shrink-0" style={{ color: 'var(--parchment-dim)' }}>{hi ? hi.name : 'Unsorted'} · {m.points} pts</span>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button onClick={() => openMove(m.id)} aria-label={`Move ${m.name}`}><ArrowRightLeft className="w-4 h-4" style={{ color: 'var(--parchment-dim)' }} /></button>
+              <button onClick={() => { setHoldTarget(m.id); setHoldProgress(0); }} aria-label={`Archive ${m.name}`}><Archive className="w-4 h-4" style={{ color: 'var(--parchment-dim)' }} /></button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderArchiveRow = (m) => {
+    const hi = m.house ? houseInfo(m.house) : null;
+    const isForgetOpen = forgetTarget === m.id;
+    return (
+      <div key={m.id} className="plaque p-4 mb-3">
+        {isForgetOpen ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm" style={{ color: 'var(--parchment-dim)' }}>Hold to permanently delete <span style={{ color: 'var(--parchment)' }}>{m.name}</span></span>
+            <div className="flex items-center gap-2">
+              <button onMouseDown={() => beginForget(m.id)} onMouseUp={endForgetEarly} onMouseLeave={endForgetEarly} onTouchStart={() => beginForget(m.id)} onTouchEnd={endForgetEarly} className="seal" aria-label={`Permanently delete ${m.name}`}>
+                <div className="seal-fill" style={{ clipPath: `inset(${100 - forgetProgress}% 0 0 0)` }} />
+                <Trash2 className="w-4 h-4 relative" style={{ color: '#f0d9d9', margin: '14px auto', zIndex: 1 }} />
+              </button>
+              <button onClick={cancelForget} aria-label="Cancel"><X className="w-4 h-4" style={{ color: 'var(--parchment-dim)' }} /></button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: hi ? hi.color : 'var(--parchment-dim)' }} />
+              <span className="text-sm font-medium truncate" style={{ color: 'var(--parchment)' }}>{m.name}</span>
+              <WinBadge wins={m.wins} />
+              <ImprovedBadge count={m.improvedWins} />
+              <span className="text-xs flex-shrink-0" style={{ color: 'var(--parchment-dim)' }}>{hi ? hi.name : 'Unsorted'} · {m.points} pts</span>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button onClick={() => restoreMember(m.id)} className="text-xs underline" style={{ color: 'var(--parchment-dim)' }}>Restore</button>
+              <button onClick={() => { setForgetTarget(m.id); setForgetProgress(0); }} aria-label={`Delete ${m.name} forever`}><Trash2 className="w-4 h-4" style={{ color: 'var(--parchment-dim)' }} /></button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="cup-app">
+      {!loaded ? (
+        <div className="flex items-center justify-center min-h-screen"><Loader2 className="w-7 h-7" style={{ color: 'var(--brass)' }} /></div>
+
+      ) : view === 'lock' ? (
+        <div className="max-w-md mx-auto px-4 py-8 pb-16 flex flex-col items-center" style={{ minHeight: '80vh', justifyContent: 'center' }}>
+          <button onClick={() => setView('board')} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--parchment-dim)', position: 'absolute', top: 32, left: 16 }}><ArrowLeft className="w-4 h-4" /> Back to board</button>
+          <div className="lock-circle mb-5"><Lock className="w-7 h-7" style={{ color: 'var(--brass)' }} /></div>
+          <p className="display text-xl mb-1" style={{ color: 'var(--brass)' }}>Settings is sealed</p>
+
+          {lockMode === 'fingerprint' ? (
+            <>
+              <p className="text-sm text-center mb-6" style={{ color: 'var(--parchment-dim)' }}>Scan to continue</p>
+              <button onClick={attemptLockFingerprint} disabled={lockBusy} className="lock-circle" style={{ borderColor: lockError ? 'var(--garnet)' : 'var(--edge)' }} aria-label="Scan fingerprint">
+                {lockBusy ? <Loader2 className="w-7 h-7" style={{ color: 'var(--parchment-dim)' }} /> : <Fingerprint className="w-7 h-7" style={{ color: 'var(--moss)' }} />}
+              </button>
+              {lockError && <p className="text-xs mt-3" style={{ color: 'var(--garnet)' }}>Couldn't verify — try again.</p>}
+              {localPinCode && <button onClick={() => { setLockMode('pin'); setPinInput(''); setPinError(false); }} className="text-xs underline mt-6" style={{ color: 'var(--parchment-dim)' }}>Use this device's code instead</button>}
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-center mb-5" style={{ color: 'var(--parchment-dim)' }}>Enter this device's code</p>
+              <input type="password" inputMode="numeric" autoFocus value={pinInput} onChange={e => setPinInput(e.target.value.replace(/[^0-9]/g, ''))} onKeyDown={e => e.key === 'Enter' && attemptLocalPin()} className="rounded-lg px-4 py-2.5 text-center text-lg tracking-widest outline-none w-32 mb-3" style={{ borderColor: pinError ? 'var(--garnet)' : undefined }} />
+              <button onClick={attemptLocalPin} className="rounded-lg px-5 py-2 text-sm font-semibold" style={{ background: 'var(--brass)', color: '#1c1306' }}>Unlock</button>
+              {pinError && <p className="text-xs mt-3" style={{ color: 'var(--garnet)' }}>Wrong code.</p>}
+              {data.fingerprintEnabled && data.fingerprintCredentialId && <button onClick={() => { setLockMode('fingerprint'); setLockError(false); }} className="text-xs underline mt-6" style={{ color: 'var(--parchment-dim)' }}>Use fingerprint instead</button>}
+            </>
+          )}
+          <p className="text-xs text-center mt-6 max-w-xs" style={{ color: 'var(--parchment-dim)' }}>Both the fingerprint and the code only ever work on the device they were set up on. If you lose this device, neither helps — export a backup from Settings ahead of time.</p>
+        </div>
+
+      ) : view === 'settings' ? (
+        <div className="max-w-md mx-auto px-4 py-8 pb-16">
+          <div className="flex items-center justify-between mb-6">
+            <button onClick={() => { setView('board'); cancelAdd(); cancelHold(); cancelMove(); cancelForget(); }} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--parchment-dim)' }}><ArrowLeft className="w-4 h-4" /> Back to board</button>
+            {securityConfigured && <button onClick={signOutAdmin} className="flex items-center gap-1 text-xs" style={{ color: 'var(--parchment-dim)' }}><LogOut className="w-3.5 h-3.5" /> Sign out</button>}
+          </div>
+          <h2 className="display text-2xl mb-5" style={{ color: 'var(--brass)' }}>Settings</h2>
+          {securityConfigured && <p className="text-xs mb-5" style={{ color: 'var(--moss)' }}>This device: recognized as Admin ✓</p>}
+
+          <div className="mb-7">
+            <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--parchment-dim)' }}>Add someone</p>
+            <div className="flex gap-2">
+              <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && openAddHouseChooser()} placeholder="Enter a name..." className="flex-1 rounded-lg px-4 py-2.5 outline-none text-sm disabled:opacity-50" disabled={addingHouse} />
+              {addingHouse ? (
+                <button onClick={cancelAdd} className="rounded-lg px-4 flex items-center justify-center pt-btn" aria-label="Cancel add"><X className="w-5 h-5" style={{ color: 'var(--parchment-dim)' }} /></button>
+              ) : (
+                <button onClick={openAddHouseChooser} className="rounded-lg px-4 flex items-center justify-center font-semibold" style={{ background: 'var(--brass)', color: '#1c1306' }} aria-label="Add name"><Plus className="w-5 h-5" /></button>
+              )}
+            </div>
+            {addingHouse && (
+              <div className="plaque p-3 mt-2">
+                <p className="text-xs mb-2" style={{ color: 'var(--parchment-dim)' }}>Sort <span style={{ color: 'var(--parchment)' }}>{newName.trim()}</span> into...</p>
+                <div className="flex gap-2 flex-wrap">{HOUSES.map(h => <button key={h.key} onClick={() => finalizeAdd(h.key)} className="rounded-md px-3 py-1.5 text-xs font-semibold" style={{ background: h.soft, border: `1px solid ${h.edge}`, color: h.color }}>{h.name}</button>)}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="mb-5">
+            <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--parchment-dim)' }}>Fingerprint for adding points</p>
+            <div className="plaque p-4">
+              {data.fingerprintCredentialId ? (
+                data.fingerprintEnabled ? (
+                  <>
+                    <p className="text-sm mb-3" style={{ color: 'var(--parchment)' }}><Fingerprint className="w-4 h-4 inline mr-1.5" style={{ color: 'var(--moss)' }} />Adding points needs a scan. It also locks Settings and the board to this device only.</p>
+                    <div className="flex gap-2"><button onClick={disableFingerprint} className="pt-btn rounded-md px-3 py-1.5 text-xs font-semibold" style={{ color: 'var(--parchment-dim)' }}>Turn off</button><button onClick={forgetFingerprint} className="text-xs underline" style={{ color: 'var(--parchment-dim)' }}>Forget saved fingerprint</button></div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm mb-3" style={{ color: 'var(--parchment-dim)' }}>Fingerprint saved but turned off — adding points uses hold-to-confirm.</p>
+                    <div className="flex gap-2"><button onClick={enableFingerprint} className="rounded-md px-3 py-1.5 text-xs font-semibold" style={{ background: 'var(--brass)', color: '#1c1306' }}>Turn on</button><button onClick={forgetFingerprint} className="text-xs underline" style={{ color: 'var(--parchment-dim)' }}>Forget saved fingerprint</button></div>
+                  </>
+                )
+              ) : (
+                <>
+                  <p className="text-sm mb-3" style={{ color: 'var(--parchment-dim)' }}>Checks your device's fingerprint sensor. Setting this up makes every other device permanently view-only — only this device will ever be able to edit.</p>
+                  <button onClick={startEnroll} disabled={bioStatus === 'checking'} className="rounded-md px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5" style={{ background: 'var(--brass)', color: '#1c1306' }}>{bioStatus === 'checking' ? <Loader2 className="w-3.5 h-3.5" /> : <Fingerprint className="w-3.5 h-3.5" />}Set up fingerprint</button>
+                  {bioStatus === 'unsupported' && <p className="text-xs mt-2" style={{ color: 'var(--garnet)' }}>Not available on this device/browser — keeping hold-to-confirm.</p>}
+                  {bioStatus === 'failed' && <p className="text-xs mt-2" style={{ color: 'var(--garnet)' }}>Couldn't complete setup — try again, or keep using hold-to-confirm.</p>}
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-7">
+            <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--parchment-dim)' }}>Backup code (this device only)</p>
+            <div className="plaque p-4">
+              {localPinCode ? (
+                <>
+                  <p className="text-sm mb-3" style={{ color: 'var(--parchment)' }}><Lock className="w-4 h-4 inline mr-1.5" style={{ color: 'var(--moss)' }} />A code is set for this device — it works only here, exactly like the fingerprint.</p>
+                  <button onClick={removeLocalPin} className="text-xs underline" style={{ color: 'var(--parchment-dim)' }}>Remove code</button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm mb-3" style={{ color: 'var(--parchment-dim)' }}>A fallback for this device only, in case fingerprint isn't available or fails. Typing it on any other device won't work — it's saved locally, never shared.</p>
+                  <div className="flex gap-2">
+                    <input value={pinSetupInput} onChange={e => setPinSetupInput(e.target.value.replace(/[^0-9]/g, ''))} placeholder="4+ digits" inputMode="numeric" className="flex-1 rounded-lg px-3 py-2 text-sm outline-none" />
+                    <button onClick={saveLocalPin} className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: 'var(--brass)', color: '#1c1306' }}>Save</button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-7">
+            <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--parchment-dim)' }}>Crown the Cup</p>
+            <div className="plaque p-4">
+              {data.members.length === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--parchment-dim)' }}>Add people first — there's no one to crown yet.</p>
+              ) : canCrown ? (
+                <>
+                  <p className="text-sm mb-3" style={{ color: 'var(--parchment-dim)' }}>Crowns the current top individual and top house, and finds whoever gained the most since last time (Most Improved). Logs all three to the Hall of Fame. Points keep accumulating either way.</p>
+                  <button onClick={crownTheCup} className="rounded-md px-3 py-2 text-xs font-semibold flex items-center gap-1.5" style={{ background: 'var(--brass)', color: '#1c1306' }}><Crown className="w-3.5 h-3.5" /> Crown the Cup</button>
+                </>
+              ) : (
+                <p className="text-sm" style={{ color: 'var(--parchment-dim)' }}>Next crowning available in {daysRemaining} day{daysRemaining === 1 ? '' : 's'}.</p>
+              )}
+              <div className="flex items-center gap-2 mt-3">
+                <span className="text-xs" style={{ color: 'var(--parchment-dim)' }}>Cooldown:</span>
+                <input type="number" min="1" value={data.crownCooldownValue} onChange={e => pushUpdate(d => ({ ...d, crownCooldownValue: Math.max(1, parseInt(e.target.value, 10) || 1) }))} className="w-14 rounded-md px-2 py-1 text-xs text-center outline-none" />
+                <select value={data.crownCooldownUnit} onChange={e => pushUpdate(d => ({ ...d, crownCooldownUnit: e.target.value }))} className="rounded-md px-2 py-1 text-xs outline-none">
+                  <option value="days">days</option><option value="months">months</option><option value="years">years</option>
+                </select>
+              </div>
+              <p className="text-xs mt-2" style={{ color: 'var(--parchment-dim)' }}>That's about {Math.round(cooldown)} day{Math.round(cooldown) === 1 ? '' : 's'} between crownings.</p>
+            </div>
+          </div>
+
+          <div className="mb-7">
+            <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--parchment-dim)' }}>Backup</p>
+            <div className="plaque p-4">
+              <p className="text-sm mb-3" style={{ color: 'var(--parchment-dim)' }}>Save a copy of everything, or restore from a file. Importing replaces what's currently on the board for everyone.</p>
+              <div className="flex gap-2">
+                <button onClick={exportBackup} className="rounded-md px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5" style={{ background: 'var(--brass)', color: '#1c1306' }}><Download className="w-3.5 h-3.5" /> Export</button>
+                <button onClick={() => importInputRef.current && importInputRef.current.click()} className="pt-btn rounded-md px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--parchment-dim)' }}><Upload className="w-3.5 h-3.5" /> Import</button>
+                <input ref={importInputRef} type="file" accept="application/json" onChange={handleImportFile} style={{ display: 'none' }} />
+              </div>
+              {importNotice && <p className="text-xs mt-2" style={{ color: 'var(--moss)' }}>{importNotice}</p>}
+            </div>
+          </div>
+
+          <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'var(--parchment-dim)' }}>Manage roster</p>
+          {data.members.length === 0 && <p className="text-sm py-6" style={{ color: 'var(--parchment-dim)' }}>No one's been added yet.</p>}
+          {unsorted.length > 0 && (
+            <div className="house-section" style={{ borderColor: 'var(--edge)', background: 'rgba(255,255,255,0.02)' }}>
+              <span className="display text-base" style={{ color: 'var(--parchment-dim)' }}>Unsorted</span>
+              <div className="mt-3">{[...unsorted].sort((a, b) => b.points - a.points).map(m => renderManageRow(m))}</div>
+            </div>
+          )}
+          {HOUSES.map(h => {
+            const members = data.members.filter(m => m.house === h.key).sort((a, b) => b.points - a.points);
+            if (members.length === 0) return null;
+            return (
+              <div key={h.key} className="house-section" style={{ borderColor: h.color, background: h.soft }}>
+                <span className="display text-base font-semibold" style={{ color: h.color }}>{h.name}</span>
+                <div className="mt-3">{members.map(m => renderManageRow(m))}</div>
+              </div>
+            );
+          })}
+
+          <p className="text-xs uppercase tracking-widest mb-2 mt-2" style={{ color: 'var(--parchment-dim)' }}>Archive</p>
+          {data.archive.length === 0 ? <p className="text-sm py-4" style={{ color: 'var(--parchment-dim)' }}>Nobody's been archived.</p> : <div>{data.archive.map(m => renderArchiveRow(m))}</div>}
+        </div>
+
+      ) : (
+        <div className="max-w-md mx-auto px-4 py-8 pb-16 relative">
+          <div className="absolute top-8 right-4 flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--parchment-dim)' }}><span className="live-dot"></span>{synced ? 'Live' : '...'}</span>
+            <button onClick={openSettingsGate} className="gear-btn" aria-label="Open settings">
+              {securityConfigured ? <Lock className="w-4 h-4" style={{ color: 'var(--parchment-dim)' }} /> : <Settings className="w-4 h-4" style={{ color: 'var(--parchment-dim)' }} />}
+            </button>
+          </div>
+
+          <div className="text-center mb-6">
+            {editingTitle ? (
+              <div className="flex items-center justify-center gap-2">
+                <input autoFocus value={titleDraft} onChange={e => setTitleDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveTitle()} className="display text-2xl text-center rounded px-3 py-1 outline-none" style={{ color: 'var(--brass)' }} />
+                <button onClick={saveTitle} aria-label="Save name"><Check className="w-5 h-5" style={{ color: 'var(--brass)' }} /></button>
+              </div>
+            ) : (
+              <h1 onClick={() => { if (canEdit) { setTitleDraft(data.title); setEditingTitle(true); } }} className="display text-3xl font-semibold" style={{ color: 'var(--brass)', letterSpacing: '0.02em', cursor: canEdit ? 'pointer' : 'default' }}>✦ {data.title} ✦</h1>
+            )}
+            <div className="divider mt-4 mb-3" />
+            <p className="display text-4xl tabular" style={{ color: 'var(--parchment)' }}>{grandTotal}</p>
+            <p className="text-xs uppercase tracking-widest mt-1" style={{ color: 'var(--parchment-dim)' }}>points · {data.members.length} on the board</p>
+            {!canEdit && <p className="text-xs mt-2" style={{ color: 'var(--parchment-dim)' }}>Viewing only — this board only accepts edits from its original device.</p>}
+          </div>
+
+          {fingerprintNotice && <p className="text-center text-xs mb-4" style={{ color: 'var(--garnet)' }}>{fingerprintNotice}</p>}
+
+          <div className="flex gap-2 mb-7">
+            {standings.map((h, i) => {
+              const winCount = data.houseWins?.[h.key] || 0;
+              return (
+                <div key={h.key} className="flex-1 rounded-lg text-center py-2" style={{ background: h.soft, border: `1px solid ${h.edge}` }}>
+                  <p className="text-xs uppercase tracking-wider truncate" style={{ color: h.color }}>{i === 0 && h.total > 0 ? '◆ ' : ''}{h.name.slice(0, 4)}</p>
+                  <p className="tabular font-semibold text-sm" style={{ color: 'var(--parchment)' }}>{h.total}</p>
+                  {winCount > 0 && <p className="text-xs mt-0.5" style={{ color: 'var(--brass)' }}>★{winCount > 1 ? `×${winCount}` : ''}</p>}
+                </div>
+              );
+            })}
+          </div>
+
+          {data.members.length === 0 && <p className="text-center text-sm py-10" style={{ color: 'var(--parchment-dim)' }}>No one's been sorted yet — open Settings to add a name.</p>}
+          {unsorted.length > 0 && (
+            <div className="house-section" style={{ borderColor: 'var(--edge)', background: 'rgba(255,255,255,0.02)' }}>
+              <div className="flex items-center justify-between mb-3"><span className="display text-lg" style={{ color: 'var(--parchment-dim)' }}>Unsorted</span><span className="text-xs" style={{ color: 'var(--parchment-dim)' }}>{unsorted.length}</span></div>
+              {[...unsorted].sort((a, b) => b.points - a.points).map((m, i) => renderBoardRow(m, i + 1))}
+            </div>
+          )}
+          {HOUSES.map(h => {
+            const members = data.members.filter(m => m.house === h.key).sort((a, b) => b.points - a.points);
+            return (
+              <div key={h.key} className="house-section" style={{ borderColor: h.color, background: h.soft }}>
+                <div className="flex items-center justify-between mb-3"><span className="display text-lg font-semibold" style={{ color: h.color }}>{h.name}</span><span className="tabular text-xs" style={{ color: 'var(--parchment-dim)' }}>{members.reduce((s, m) => s + m.points, 0)} pts · {members.length}</span></div>
+                {members.length === 0 ? <p className="text-xs" style={{ color: 'var(--parchment-dim)' }}>No one here yet.</p> : members.map((m, i) => renderBoardRow(m, i + 1))}
+              </div>
+            );
+          })}
+
+          {data.hallOfFame.length > 0 && (
+            <div className="mt-2">
+              <div className="divider mb-3" />
+              <button onClick={() => setShowHallOfFame(s => !s)} className="w-full flex items-center justify-between text-xs uppercase tracking-widest py-1" style={{ color: 'var(--brass)' }}><span>★ Hall of Fame</span>{showHallOfFame ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
+              {showHallOfFame && (
+                <div className="space-y-2 mt-2">
+                  {data.hallOfFame.map(r => (
+                    <div key={r.id} className="plaque p-3">
+                      <p className="text-xs mb-1" style={{ color: 'var(--parchment-dim)' }}>{new Date(r.crownedAt).toLocaleDateString()}</p>
+                      {r.individual && <p className="text-sm" style={{ color: 'var(--parchment)' }}>🏆 {r.individual.name} — {r.individual.points} pts</p>}
+                      {r.house && <p className="text-sm" style={{ color: houseInfo(r.house.key)?.color || 'var(--parchment)' }}>★ {r.house.name} — {r.house.total} pts</p>}
+                      {r.improved && <p className="text-sm" style={{ color: 'var(--moss)' }}>▲ {r.improved.name} — +{r.improved.gain} pts this term</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {data.activity.length > 0 && (
+            <div className="mt-2">
+              <div className="divider mb-3" />
+              <button onClick={() => setShowLedger(s => !s)} className="w-full flex items-center justify-between text-xs uppercase tracking-widest py-1" style={{ color: 'var(--parchment-dim)' }}><span>The ledger</span>{showLedger ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}</button>
+              {showLedger && (
+                <div className="space-y-1.5 max-h-56 overflow-y-auto mt-2 pr-1">
+                  {data.activity.map(a => (
+                    <div key={a.id} className="text-xs flex justify-between gap-2" style={{ color: 'var(--parchment-dim)' }}>
+                      <span style={{ color: 'var(--parchment)' }}>{a.text}</span>
+                      <span className="tabular flex-shrink-0">{new Date(a.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<TheCup />);
+</script>
+</body>
+</html>

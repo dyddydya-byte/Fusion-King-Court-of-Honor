@@ -1,0 +1,9 @@
+{
+  "name": "Fusion King Court of Honor",
+  "short_name": "Court of Honor",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#14111f",
+  "theme_color": "#14111f",
+  "orientation": "portrait"
+}
