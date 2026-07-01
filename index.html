@@ -677,8 +677,12 @@ function TheCup() {
               const isHeld = pointHold && pointHold.id === m.id && pointHold.delta === v && !pointHold.isCustom;
               return (
                 <button key={v}
-                  onMouseDown={() => beginPointHold(m.id, m.name, v)} onMouseUp={endPointHoldEarly} onMouseLeave={endPointHoldEarly}
-                  onTouchStart={() => beginPointHold(m.id, m.name, v)} onTouchEnd={endPointHoldEarly}
+                  onMouseDown={() => beginPointHold(m.id, m.name, v)}
+                  onMouseUp={endPointHoldEarly}
+                  onMouseLeave={(e) => { if (e.sourceCapabilities && !e.sourceCapabilities.firesTouchEvents) endPointHoldEarly(); }}
+                  onTouchStart={(e) => { e.preventDefault(); beginPointHold(m.id, m.name, v); }}
+                  onTouchEnd={(e) => { e.preventDefault(); endPointHoldEarly(); }}
+                  onTouchCancel={(e) => { e.preventDefault(); endPointHoldEarly(); }}
                   className={`pt-btn relative overflow-hidden ${v > 0 ? 'pos' : 'neg'}`}>
                   {isHeld && <span className="absolute inset-0" style={{ background: v > 0 ? 'rgba(111,174,115,0.4)' : 'rgba(162,62,62,0.4)', clipPath: `inset(${100 - pointHoldProgress}% 0 0 0)` }} />}
                   <span className="relative z-10">{v > 0 ? `+${v}` : v}</span>
@@ -686,13 +690,39 @@ function TheCup() {
               );
             })}
             <input value={customInputs[m.id] || ''} onChange={e => setCustomInputs(c => ({ ...c, [m.id]: e.target.value.replace(/[^-0-9]/g, '') }))} placeholder="±" className="pt-custom" style={{ background: '#161029', border: '1px solid var(--edge)', color: 'var(--parchment)' }} />
-            <button
-              onMouseDown={() => beginCustomHold(m.id, m.name)} onMouseUp={endPointHoldEarly} onMouseLeave={endPointHoldEarly}
-              onTouchStart={() => beginCustomHold(m.id, m.name)} onTouchEnd={endPointHoldEarly}
-              className="pt-btn relative overflow-hidden" style={{ color: 'var(--parchment-dim)' }}>
-              {pointHold && pointHold.id === m.id && pointHold.isCustom && <span className="absolute inset-0" style={{ background: 'rgba(201,162,39,0.35)', clipPath: `inset(${100 - pointHoldProgress}% 0 0 0)` }} />}
-              <span className="relative z-10">Hold</span>
-            </button>
+            {(() => {
+              const raw = customInputs[m.id];
+              const val = parseInt(raw, 10);
+              const isPositive = !Number.isNaN(val) && val > 0;
+              const busyKey = `${m.id}:custom`;
+              const isBusy = fingerprintBusy === busyKey;
+              if (useFingerprintForAdd && isPositive) {
+                return (
+                  <button onClick={async () => {
+                    setFingerprintBusy(busyKey);
+                    const ok = await verifyFingerprint();
+                    setFingerprintBusy(null);
+                    if (ok) { changePoints(m.id, m.name, val); setCustomInputs(c => ({ ...c, [m.id]: '' })); }
+                    else { setFingerprintNotice("Couldn't verify — try again."); setTimeout(() => setFingerprintNotice(null), 2200); }
+                  }} disabled={isBusy} className="pt-btn pos flex items-center gap-1">
+                    {isBusy ? <Loader2 className="w-3 h-3" /> : <Fingerprint className="w-3 h-3" />} Go
+                  </button>
+                );
+              }
+              return (
+                <button
+                  onMouseDown={() => beginCustomHold(m.id, m.name)}
+                  onMouseUp={endPointHoldEarly}
+                  onMouseLeave={(e) => { if (e.sourceCapabilities && !e.sourceCapabilities.firesTouchEvents) endPointHoldEarly(); }}
+                  onTouchStart={(e) => { e.preventDefault(); beginCustomHold(m.id, m.name); }}
+                  onTouchEnd={(e) => { e.preventDefault(); endPointHoldEarly(); }}
+                  onTouchCancel={(e) => { e.preventDefault(); endPointHoldEarly(); }}
+                  className="pt-btn relative overflow-hidden" style={{ color: 'var(--parchment-dim)' }}>
+                  {pointHold && pointHold.id === m.id && pointHold.isCustom && <span className="absolute inset-0" style={{ background: 'rgba(201,162,39,0.35)', clipPath: `inset(${100 - pointHoldProgress}% 0 0 0)` }} />}
+                  <span className="relative z-10">Hold</span>
+                </button>
+              );
+            })()}
           </div>
         ) : <p className="text-xs pl-9" style={{ color: 'var(--parchment-dim)' }}>View only</p>}
       </div>
