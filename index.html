@@ -44,6 +44,13 @@
 
 <style>
   html, body { margin: 0; padding: 0; }
+  .cup-app {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .cup-page { padding-top: 24px; }
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
   .cup-app {
     --ink: #14111f; --panel: #1c1729; --edge: #34294c; --brass: #c9a227; --brass-soft: #8a7128;
@@ -788,7 +795,7 @@ function TheCup() {
         <div className="flex items-center justify-center min-h-screen"><Loader2 className="w-7 h-7" style={{ color: 'var(--brass)' }} /></div>
 
       ) : view === 'lock' ? (
-        <div className="max-w-md mx-auto px-4 py-8 pb-16 flex flex-col items-center" style={{ minHeight: '80vh', justifyContent: 'center' }}>
+        <div className="cup-page max-w-md mx-auto px-4 py-8 pb-16 flex flex-col items-center" style={{ minHeight: '80vh', justifyContent: 'center' }}>
           <button onClick={() => setView('board')} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--parchment-dim)', position: 'absolute', top: 32, left: 16 }}><ArrowLeft className="w-4 h-4" /> Back to board</button>
           <div className="lock-circle mb-5"><Lock className="w-7 h-7" style={{ color: 'var(--brass)' }} /></div>
           <p className="display text-xl mb-1" style={{ color: 'var(--brass)' }}>Settings is sealed</p>
@@ -815,7 +822,7 @@ function TheCup() {
         </div>
 
       ) : view === 'settings' ? (
-        <div className="max-w-md mx-auto px-4 py-8 pb-16">
+        <div className="cup-page max-w-md mx-auto px-4 py-8 pb-16">
           <div className="flex items-center justify-between mb-6">
             <button onClick={() => { setView('board'); cancelAdd(); cancelHold(); cancelMove(); cancelForget(); }} className="flex items-center gap-1.5 text-sm" style={{ color: 'var(--parchment-dim)' }}><ArrowLeft className="w-4 h-4" /> Back to board</button>
             {securityConfigured && <button onClick={signOutAdmin} className="flex items-center gap-1 text-xs" style={{ color: 'var(--parchment-dim)' }}><LogOut className="w-3.5 h-3.5" /> Sign out</button>}
@@ -948,7 +955,7 @@ function TheCup() {
         </div>
 
       ) : (
-        <div className="max-w-md mx-auto px-4 py-8 pb-16 relative">
+        <div className="cup-page max-w-md mx-auto px-4 pb-16 relative">
           <div className="absolute top-8 right-4 flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--parchment-dim)' }}><span className="live-dot"></span>{synced ? 'Live' : '...'}</span>
             <button onClick={openSettingsGate} className="gear-btn" aria-label="Open settings">
