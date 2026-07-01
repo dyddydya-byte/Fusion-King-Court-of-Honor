@@ -63,12 +63,12 @@
   .cup-app .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--brass-soft) 15%, var(--brass) 50%, var(--brass-soft) 85%, transparent); opacity: 0.55; }
   .cup-app .plaque { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; }
   .cup-app .roman { font-family: 'Cormorant Garamond', serif; color: var(--brass); }
-  .cup-app .pt-btn { font-family: 'Inter', sans-serif; border: 1px solid var(--edge); background: transparent; min-height: 40px; min-width: 44px; font-size: 14px; padding: 8px 12px; border-radius: 8px; }
+  .cup-app .pt-btn { font-family: 'Inter', sans-serif; border: 1px solid var(--edge); background: transparent; min-height: 48px; min-width: 52px; font-size: 15px; font-weight: 600; padding: 10px 14px; border-radius: 10px; }
   .cup-app .pt-btn.pos { color: var(--moss); border-color: rgba(111,174,115,0.35); }
   .cup-app .pt-btn.neg { color: var(--garnet); border-color: rgba(162,62,62,0.35); }
   .cup-app .pt-btn:disabled { opacity: 0.6; }
-  .cup-app .pt-row { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 28px; margin-top: 4px; }
-  .cup-app .pt-custom { width: 56px; min-height: 40px; font-size: 14px; border-radius: 8px; text-align: center; padding: 0 4px; outline: none; }
+  .cup-app .pt-row { display: flex; flex-wrap: wrap; gap: 10px; padding-left: 0; margin-top: 8px; }
+  .cup-app .pt-custom { width: 64px; min-height: 48px; font-size: 15px; border-radius: 10px; text-align: center; padding: 0 4px; outline: none; }
   .cup-app input, .cup-app select { background: #161029; border: 1px solid var(--edge); color: var(--parchment); }
   .cup-app input::placeholder { color: var(--parchment-dim); }
   .cup-app .seal { position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(162,62,62,0.5); background: rgba(162,62,62,0.08); overflow: hidden; flex-shrink: 0; }
@@ -665,12 +665,12 @@ function TheCup() {
         {canEdit ? (
           <div className="pt-row">
             {[-10, -5, -1, 1, 5, 10].map(v => {
-              if (v > 0 && useFingerprintForAdd) {
+              if (useFingerprintForAdd) {
                 const busyKey = `${m.id}:${v}`;
                 const isBusy = fingerprintBusy === busyKey;
                 return (
-                  <button key={v} onClick={() => handleFingerprintAdd(m.id, m.name, v)} disabled={isBusy} className="pt-btn pos flex items-center gap-1">
-                    {isBusy ? <Loader2 className="w-3 h-3" /> : <Fingerprint className="w-3 h-3" />}{`+${v}`}
+                  <button key={v} onClick={() => handleFingerprintAdd(m.id, m.name, v)} disabled={isBusy} className={`pt-btn flex items-center gap-1 ${v > 0 ? 'pos' : 'neg'}`}>
+                    {isBusy ? <Loader2 className="w-3 h-3" /> : <Fingerprint className="w-3 h-3" />}{v > 0 ? `+${v}` : v}
                   </button>
                 );
               }
@@ -693,18 +693,19 @@ function TheCup() {
             {(() => {
               const raw = customInputs[m.id];
               const val = parseInt(raw, 10);
-              const isPositive = !Number.isNaN(val) && val > 0;
+              const hasValue = !Number.isNaN(val) && val !== 0;
               const busyKey = `${m.id}:custom`;
               const isBusy = fingerprintBusy === busyKey;
-              if (useFingerprintForAdd && isPositive) {
+              if (useFingerprintForAdd) {
                 return (
                   <button onClick={async () => {
+                    if (!hasValue) return;
                     setFingerprintBusy(busyKey);
                     const ok = await verifyFingerprint();
                     setFingerprintBusy(null);
                     if (ok) { changePoints(m.id, m.name, val); setCustomInputs(c => ({ ...c, [m.id]: '' })); }
                     else { setFingerprintNotice("Couldn't verify — try again."); setTimeout(() => setFingerprintNotice(null), 2200); }
-                  }} disabled={isBusy} className="pt-btn pos flex items-center gap-1">
+                  }} disabled={isBusy || !hasValue} className="pt-btn flex items-center gap-1" style={{ color: val < 0 ? 'var(--garnet)' : 'var(--moss)', borderColor: val < 0 ? 'rgba(162,62,62,0.35)' : 'rgba(111,174,115,0.35)' }}>
                     {isBusy ? <Loader2 className="w-3 h-3" /> : <Fingerprint className="w-3 h-3" />} Go
                   </button>
                 );
